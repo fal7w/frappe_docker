@@ -1,0 +1,50 @@
+name: Tag Pull Requests
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  tag_pull_request:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check if pull request is merged
+        uses: actions/github-script@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr.merged) {
+              console.log('Pull request is merged.');
+              console.log(`Branch name: ${pr.head.ref}`);
+              console.log(`Labels: ${pr.labels.map(label => label.name).join(', ')}`);
+              console.log(`Merged by: ${pr.merged_by.login}`);
+              console.log(`SHA: ${pr.head.sha}`);
+              console.log(`Repository: ${context.repo.repo}`);
+              console.log(`Owner: ${context.repo.owner}`);
+            } else {
+              console.log('Pull request is not merged. Exiting workflow.');
+              process.exit(78);
+            }
+
+      - name: Tag pull request based on branch name
+        id: tag
+        run: |
+          branchName=${{ github.event.pull_request.head.ref }}
+          case $branchName in
+            hotfix*) echo "##[set-output name=tag]hotfix" ;;
+            bugfix*) echo "##[set-output name=tag]bugfix" ;;
+            feature*) echo "##[set-output name=tag]feature" ;;
+            enhancement*) echo "##[set-output name=tag]enhancement" ;;
+            *) echo "##[set-output name=tag]other" ;;
+          esac
+
+      - name: Create tag
+        if: steps.tag.outputs.tag != 'other'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag -a ${{ steps.tag.outputs.tag }} -m "Tagging pull request"
+          git push --tags
