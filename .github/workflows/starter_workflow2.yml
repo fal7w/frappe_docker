@@ -5,4 +5,4 @@ on:
 
 jobs:
   call_workflow_using_branch:
-    uses: fal7w/Scripts/.github/workflows/Reusable_workflow.yml@main
+    uses: fal7w/Scripts/.github/workflows/Reusable_workflow.yml@36-ssdd
