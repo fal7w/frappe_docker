@@ -1,0 +1,8 @@
+name: starter workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call_workflow_using_branch:
+    uses: fal7w/Scripts/.github/workflows/Reusable_workflow.yml@main
