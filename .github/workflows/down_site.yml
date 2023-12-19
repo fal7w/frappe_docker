@@ -1,0 +1,25 @@
+name: down site base on project name 
+
+on:
+  workflow_dispatch:
+# on:
+  pull_request:
+    types:
+      - closed
+  workflow_call:
+
+jobs:
+  down_site:
+    runs-on:
+      - self-hosted
+      # - ubuntu-latest
+
+
+
+    steps:
+      - name: drop site commond
+        run: |
+          docker-compose --project-name ${{ github.event.pull_request.head.ref }} exec backend \
+              bench drop-site  --db-root-password ${{ vars.MARIADB_PASSWORD }} ${{ github.event.pull_request.head.ref }}
+        
+      
