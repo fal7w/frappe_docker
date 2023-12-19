@@ -2,7 +2,7 @@ version: "3"
 
 services:
   backend:
-    image: frappe/erpnext:v14.21.0
+    image: remittance_network_agent/${BRANCH_NAME}:latest
     deploy:
       restart_policy:
         condition: on-failure
@@ -11,7 +11,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   configurator:
-    image: frappe/erpnext:v14.21.0
+    image: remittance_network_agent/${BRANCH_NAME}:latest
     deploy:
       restart_policy:
         condition: none
@@ -39,7 +39,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   create-site:
-    image: frappe/erpnext:v14.21.0
+    image: remittance_network_agent/${BRANCH_NAME}:latest
     deploy:
       restart_policy:
         condition: none
@@ -67,12 +67,12 @@ services:
           fi
         done;
         echo "sites/common_site_config.json found";
-        bench new-site --no-mariadb-socket --admin-password=admin --db-root-password=admin --install-app erpnext --set-default frontend;
+    # bench new-site --no-mariadb-socket --admin-password=${DBPASSWORd} --db-root-password=${DBPASSWORd} --install-app erpnext --set-default ${FRAPPE_SITE_NAME_HEADER};
 
   db:
     image: mariadb:10.6
     healthcheck:
-      test: mysqladmin ping -h localhost --password=admin
+      test: mysqladmin ping -h localhost --password=${DBPASSWORd}
       interval: 1s
       retries: 15
     deploy:
@@ -84,12 +84,12 @@ services:
       - --skip-character-set-client-handshake
       - --skip-innodb-read-only-compressed # Temporary fix for MariaDB 10.6
     environment:
-      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: ${DBPASSWORd}
     volumes:
       - db-data:/var/lib/mysql
 
   frontend:
-    image: frappe/erpnext:v14.21.0
+    image: remittance_network_agent/${BRANCH_NAME}:latest
     deploy:
       restart_policy:
         condition: on-failure
@@ -97,7 +97,7 @@ services:
       - nginx-entrypoint.sh
     environment:
       BACKEND: backend:8000
-      FRAPPE_SITE_NAME_HEADER: frontend
+      FRAPPE_SITE_NAME_HEADER: ${FRAPPE_SITE_NAME_HEADER}
       SOCKETIO: websocket:9000
       UPSTREAM_REAL_IP_ADDRESS: 149.102.140.77
       UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
@@ -108,10 +108,10 @@ services:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
     ports:
-      - "8080:8080"
+      - "${PORTS}:8080"
 
   queue-long:
-    image: frappe/erpnext:v14.21.0
+    image: remittance_network_agent/${BRANCH_NAME}:latest
     deploy:
       restart_policy:
         condition: on-failure
@@ -125,7 +125,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   queue-short:
-    image: frappe/erpnext:v14.21.0
+    image: remittance_network_agent/${BRANCH_NAME}:latest
     deploy:
       restart_policy:
         condition: on-failure
@@ -155,7 +155,7 @@ services:
       - redis-cache-data:/data
 
   scheduler:
-    image: frappe/erpnext:v14.21.0
+    image: remittance_network_agent/${BRANCH_NAME}:latest
     deploy:
       restart_policy:
         condition: on-failure
@@ -167,7 +167,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   websocket:
-    image: frappe/erpnext:v14.21.0
+    image: remittance_network_agent/${BRANCH_NAME}:latest
     deploy:
       restart_policy:
         condition: on-failure
