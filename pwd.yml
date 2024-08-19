@@ -2,19 +2,18 @@ version: "3"
 
 services:
   backend:
-    image: remittance_network_agent/${BRANCH_NAME}:latest
+    image: ${TAG:?No TAG set}
     deploy:
-      restart_policy:
-        condition: on-failure
+    restart: always
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
+      - /home/erpnext/backup_site:/home/frappe/frappe-bench/sites/backup_site
 
   configurator:
-    image: remittance_network_agent/${BRANCH_NAME}:latest
+    image: ${TAG:?No TAG set}
     deploy:
-      restart_policy:
-        condition: none
+    restart: always
     entrypoint:
       - bash
       - -c
@@ -39,10 +38,9 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   create-site:
-    image: remittance_network_agent/${BRANCH_NAME}:latest
+    image: ${TAG:?No TAG set}
     deploy:
-      restart_policy:
-        condition: none
+    restart: always
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
@@ -76,8 +74,7 @@ services:
       interval: 1s
       retries: 15
     deploy:
-      restart_policy:
-        condition: on-failure
+    restart: on-failure
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -89,10 +86,9 @@ services:
       - db-data:/var/lib/mysql
 
   frontend:
-    image: remittance_network_agent/${BRANCH_NAME}:latest
+    image: ${TAG:?No TAG set}
     deploy:
-      restart_policy:
-        condition: on-failure
+    restart: on-failure
     command:
       - nginx-entrypoint.sh
     environment:
@@ -111,10 +107,9 @@ services:
       - "${PORTS}:8080"
 
   queue-long:
-    image: remittance_network_agent/${BRANCH_NAME}:latest
+    image: ${TAG:?No TAG set}
     deploy:
-      restart_policy:
-        condition: on-failure
+    restart: on-failure
     command:
       - bench
       - worker
@@ -125,10 +120,9 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   queue-short:
-    image: remittance_network_agent/${BRANCH_NAME}:latest
+    image: ${TAG:?No TAG set}
     deploy:
-      restart_policy:
-        condition: on-failure
+    restart: on-failure
     command:
       - bench
       - worker
@@ -141,24 +135,21 @@ services:
   redis-queue:
     image: redis:6.2-alpine
     deploy:
-      restart_policy:
-        condition: on-failure
+    restart: on-failure
     volumes:
       - redis-queue-data:/data
 
   redis-cache:
     image: redis:6.2-alpine
     deploy:
-      restart_policy:
-        condition: on-failure
+    restart: on-failure
     volumes:
       - redis-cache-data:/data
 
   scheduler:
-    image: remittance_network_agent/${BRANCH_NAME}:latest
+    image: ${TAG:?No TAG set}
     deploy:
-      restart_policy:
-        condition: on-failure
+    restart: on-failure
     command:
       - bench
       - schedule
@@ -167,10 +158,9 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   websocket:
-    image: remittance_network_agent/${BRANCH_NAME}:latest
+    image: ${TAG:?No TAG set}
     deploy:
-      restart_policy:
-        condition: on-failure
+    restart: on-failure
     command:
       - node
       - /home/frappe/frappe-bench/apps/frappe/socketio.js
