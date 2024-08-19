@@ -79,6 +79,8 @@ jobs:
           git clone --recursive https://github.com/fal7w/frappe_docker.git
           cd frappe_docker
           chmod +x ./build_template.sh
+          chmod +x ./frappe_docker/build_image.sh
+          
           CACHE=""
           CONTAINER_FILE=""
           if ${{ inputs.use_cache }} ; then
