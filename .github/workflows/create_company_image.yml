@@ -63,7 +63,7 @@ on:
         required: true
 jobs:
   Build-Image:
-    runs-on: org208_runner
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
