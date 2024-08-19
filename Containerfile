@@ -1,11 +1,13 @@
-ARG PYTHON_VERSION=3.10.5
-FROM python:${PYTHON_VERSION}-slim-bullseye AS base
+ARG PYTHON_VERSION=3.11.6
+ARG DEBIAN_BASE=bookworm
+FROM python:${PYTHON_VERSION}-slim-${DEBIAN_BASE} AS base
 
 COPY resources/nginx-template.conf /templates/nginx/frappe.conf.template
 COPY resources/nginx-entrypoint.sh /usr/local/bin/nginx-entrypoint.sh
 
-ARG WKHTMLTOPDF_VERSION=0.12.6-1
-ARG NODE_VERSION=18.19.0
+ARG WKHTMLTOPDF_VERSION=0.12.6.1-3
+ARG WKHTMLTOPDF_DISTRO=bookworm
+ARG NODE_VERSION=18.18.2
 ENV NVM_DIR=/home/frappe/.nvm
 ENV PATH ${NVM_DIR}/versions/node/v${NODE_VERSION}/bin/:${PATH}
 
@@ -34,7 +36,7 @@ RUN useradd -ms /bin/bash frappe \
     jq \
     # NodeJS
     && mkdir -p ${NVM_DIR} \
-    && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh | bash \
+    && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash \
     && . ${NVM_DIR}/nvm.sh \
     && nvm install ${NODE_VERSION} \
     && nvm use v${NODE_VERSION} \
@@ -47,7 +49,7 @@ RUN useradd -ms /bin/bash frappe \
     # Install wkhtmltopdf with patched qt
     && if [ "$(uname -m)" = "aarch64" ]; then export ARCH=arm64; fi \
     && if [ "$(uname -m)" = "x86_64" ]; then export ARCH=amd64; fi \
-    && downloaded_file=wkhtmltox_$WKHTMLTOPDF_VERSION.buster_${ARCH}.deb \
+    && downloaded_file=wkhtmltox_${WKHTMLTOPDF_VERSION}.${WKHTMLTOPDF_DISTRO}_${ARCH}.deb \
     && curl -sLO https://github.com/wkhtmltopdf/packaging/releases/download/$WKHTMLTOPDF_VERSION/$downloaded_file \
     && apt-get install -y ./$downloaded_file \
     && rm $downloaded_file \
@@ -99,11 +101,9 @@ RUN if [ -n "${APPS_JSON_BASE64}" ]; then \
     mkdir /opt/frappe && echo "${APPS_JSON_BASE64}" | base64 -d > /opt/frappe/apps.json; \
   fi
 
-
-FROM builder AS init-frappe
 USER frappe
 
-ARG FRAPPE_BRANCH=version-14
+ARG FRAPPE_BRANCH=version-15
 ARG FRAPPE_PATH=https://github.com/frappe/frappe
 RUN export APP_INSTALL_ARGS="" && \
   if [ -n "${APPS_JSON_BASE64}" ]; then \
@@ -121,60 +121,13 @@ RUN export APP_INSTALL_ARGS="" && \
   echo "{}" > sites/common_site_config.json && \
   find apps -mindepth 1 -path "*/.git" | xargs rm -fr
 
-
-
-
-# FROM base as backend
-#
-# USER frappe
-#
-# COPY --from=builder --chown=frappe:frappe /home/frappe/frappe-bench /home/frappe/frappe-bench
-#
-# WORKDIR /home/frappe/frappe-bench
-
-FROM init-frappe AS compile
-ARG GITHUB_AUTH_TOKEN
-ARG KEYGEN_ACCOUNT_ID
-USER root
-RUN cd /home/frappe \
-    && mkdir -p /var/lib/dbus/ \
-    && cat /sys/class/dmi/id/product_uuid > /var/lib/dbus/machine-id \
-    && chmod a+r /var/lib/dbus /var/lib/dbus/machine-id \
-    && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y gcc glibc-source build-essential libc6-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && python3 -m venv compile-env \
-    && cd compile-env \
-    && git clone https://{user}:${GITHUB_AUTH_TOKEN}@github.com/fintechsys/example-python-machine-activation.git --branch frappe --depth=1 \
-    && ./bin/python -m pip install -r example-python-machine-activation/requirements.txt \
-    && cd /home/frappe/frappe-bench/apps \
-    && if [ -n "${KEYGEN_ACCOUNT_ID}" ] ; then \
-        for i in `find -maxdepth 1 -type d -name "rule_management" ` ; do \
-            cd "$i" \
-            && sed -i "s/b7ce1449-4248-47db-add6-e87242bdde5a/${KEYGEN_ACCOUNT_ID}/g" "${i}/activate.py" \
-        ; done \
-    fi \
-    && cd /home/frappe/frappe-bench/apps \
-    && for i in `find -maxdepth 1 -type d \( -name "*remittance*" -o -name "client_account_management" -o -name "payment_management" -o -name "teller*" -o -name "bank_services" -o -name "hr_app" -o -name "service_bot" \)` ; do \
-        cd "$i" \
-        && /home/frappe/compile-env/bin/python /home/frappe/compile-env/example-python-machine-activation/compile.py \
-        && find  build/ -name "__init__.py" -delete \
-        && cp -fr build/* . \
-        && rm -rf build \
-        && rm -rf .cython \
-        && find . -type f -name "*.py" ! -name "__init__.py" ! -path "*/www/*" -delete \
-        && cd .. \
-    ; done
-
-
-FROM base AS backend
+FROM base as backend
 
 USER frappe
 
-COPY --from=compile --chown=frappe:frappe /home/frappe/frappe-bench /home/frappe/frappe-bench
+COPY --from=builder --chown=frappe:frappe /home/frappe/frappe-bench /home/frappe/frappe-bench
 
 WORKDIR /home/frappe/frappe-bench
-
 
 VOLUME [ \
   "/home/frappe/frappe-bench/sites", \
