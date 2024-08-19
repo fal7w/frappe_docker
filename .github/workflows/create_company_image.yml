@@ -85,6 +85,7 @@ jobs:
           CONTAINER_FILE=""
           if ${{ inputs.use_cache }} ; then
               CACHE="--cache"
+              pwd
           fi
           
           if [ -n "${{ inputs.container_file }}" ] ; then
