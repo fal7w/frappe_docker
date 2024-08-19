@@ -1,0 +1,10 @@
+[
+ {
+  "branch": "version-14",
+  "url": "https://github.com/fintechsys/erpnext.git"
+ },
+ {
+  "branch": "version-14",
+  "url": "https://github.com/frappe/helpdesk.git"
+ }
+]
