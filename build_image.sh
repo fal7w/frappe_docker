@@ -59,7 +59,7 @@ DUPLICATE_APPS=3
 TEMP=$(getopt -o "" --long "apps-json:,frappe-path:,frappe-branch:,token:,build-commend:,container-file:,tag:,fintech-branch:,app-branch:,working-dir:,node-version:,keygen-account:,remove-user,no-remove-user,cache,no-cache,dry-run,help" -- "$@" )
 eval set -- "$TEMP"
 
-SCRIPT_PATH="$(dirname "$(readlink -f "$0")")"
+SCRIPT_PATH="/root/test/frappe_docker/"
 FRAPPE_PATH=https://github.com/fintechsys/frappe.git
 FRAPPE_BRANCH=version-14
 FINTECH_BRANCH=version-14
