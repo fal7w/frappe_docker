@@ -1,0 +1,102 @@
+name: Create Company Image
+
+on:
+  workflow_dispatch:
+     inputs:
+      branch_name:
+        description: 'Branch Name'
+        required: true
+      frappe_branch_name:
+        description: 'Frappe Branch Name'
+        required: true
+        default: version-14
+      docker_repository:
+        description: 'Docker Image Repository'
+        required: true
+      apps_template_json:
+        description: 'Apps Json Template File'
+        required: true
+      keygen_account:
+        description: 'Keygen Account Id'
+      container_file:
+        description: 'Docker File used to build image'
+        default: "./Containerfile"
+      use_cache:
+        description: 'Use Cache'
+        type: boolean
+
+        
+  workflow_call:
+    inputs:
+      branch_name:
+        description: 'Branch Name'
+        type: string
+        required: true
+      frappe_branch_name:
+        description: 'Frappe Branch Name'
+        required: true
+        default: version-14
+        type: string
+      docker_repository:
+        description: 'Docker Image Repository'
+        required: true
+        type: string
+      apps_template_json:
+        description: 'Apps Json Template File'
+        required: true
+        type: string
+      keygen_account:
+        description: 'Keygen Account Id'
+        type: string
+      container_file:
+        description: 'Docker File used to build image'
+        default: "./Containerfile"
+        type: string
+      use_cache:
+        description: 'Use Cache'
+        type: boolean
+   
+    secrets:
+      org_token:
+        required: true
+      org_deploy_token:  
+        required: true
+jobs:
+  Build-Image:
+    runs-on: org208_runner
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        # with:
+          # repository: fintechsys/remittance_image_builder
+          # ref: master
+          # path: remittance_image_builder
+          # submodules: 'recursive' # This checks out all submodules recursively
+          
+      - name: build image
+        run: |  
+          git clone --recursive https://${{ secrets.org_token }}@github.com/fintechsys/remittance_image_builder.git
+          cd remittance_image_builder
+          CACHE=""
+          CONTAINER_FILE=""
+          if ${{ inputs.use_cache }} ; then
+              CACHE="--cache"
+          fi
+          
+          if [ -n "${{ inputs.container_file }}" ] ; then
+            CONTAINER_FILE="--container-file=${{ inputs.container_file }}"
+          fi
+          ./build_template.sh --template="${{ inputs.apps_template_json }}" -- \
+          --tag="${{ inputs.docker_repository }}:latest" \
+          --token="${{ secrets.org_deploy_token }}"  ${CACHE} "${CONTAINER_FILE}" \
+          --frappe-path="https://github.com/fintechsys/frappe.git" --frappe-branch="${{ inputs.frappe_branch_name }}" \
+          --fintech-branch=${{ inputs.branch_name }} --node-version=18.0.0 \
+          --keygen-account="${{ inputs.keygen_account }}"
+      - name: push to harbor
+        run: |
+          docker push ${{ inputs.docker_repository }}:latest
+
+      - name: remove image
+        run: |
+          docker image remove --force ${{ inputs.docker_repository }}:latest
