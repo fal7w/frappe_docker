@@ -15,7 +15,10 @@ on:
         required: true
       apps_template_json:
         description: 'Apps Json Template File'
-        required: true
+        required: false
+      apps_raw_json:
+        description: 'Apps Json Raw'
+        required: false
       keygen_account:
         description: 'Keygen Account Id'
       container_file:
@@ -63,7 +66,7 @@ on:
         required: true
 jobs:
   Build-Image:
-    runs-on: ubuntu-latest
+    runs-on: org164_runner
 
     steps:
       - name: Checkout
@@ -75,23 +78,31 @@ jobs:
           # submodules: 'recursive' # This checks out all submodules recursively
           
       - name: build image
-        run: |  
-          # git clone --recursive https://github.com/fal7w/frappe_docker.git
-          # cd frappe_docker
-          chmod +x ./build_template.sh
-          chmod +x ./build_image.sh
-          
+        run: | 
+          git clone --recursive https://${{ secrets.org_token }}@github.com/fintechsys/remittance_image_builder.git
+          cd remittance_image_builder
           CACHE=""
           CONTAINER_FILE=""
           if ${{ inputs.use_cache }} ; then
               CACHE="--cache"
-              pwd
           fi
           
           if [ -n "${{ inputs.container_file }}" ] ; then
             CONTAINER_FILE="--container-file=${{ inputs.container_file }}"
           fi
-          ./build_template.sh --template="${{ inputs.apps_template_json }}" -- \
+          
+          if [ -n "${{ inputs.apps_template_json }}" ] ; then
+            APPS_JSON=$(cat "${{ inputs.apps_template_json }}")
+          elif [ -n "${{ inputs.apps_raw_json }}" ] ; then 
+            APPS_JSON="${{ inputs.apps_raw_json }}"
+          fi
+          
+          if [ -z "$APPS_JSON" ] ; then
+            echo "Set JSON FILE or JSON DATA"
+            exit 32
+          fi
+          
+          ./build_image.sh --apps-json="$APPS_JSON" \
           --tag="${{ inputs.docker_repository }}:latest" \
           --token="${{ secrets.org_deploy_token }}"  ${CACHE} "${CONTAINER_FILE}" \
           --frappe-path="https://github.com/fintechsys/frappe.git" --frappe-branch="${{ inputs.frappe_branch_name }}" \
