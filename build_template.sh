@@ -4,40 +4,41 @@
 SCRIPT_PATH="$(dirname "$(readlink -f "$0")")"
 
 function template_help() {
-    cat << EOF
+	#statements
+	cat << EOF
 usage:
     build_template.sh --template=<path-to-template> -- --tag=<tag> [build_image.sh OPTIONS]
 
 build_image.sh help:
 EOF
-    "$SCRIPT_PATH/build_image.sh" --help
-    exit ${1:-0}
+	"$SCRIPT_PATH/build_image.sh" --help
+	exit ${1:-0}
 }
 
 function check_args() {
-    if [ -z "$TEMPLATE" ]; then
-        template_help 19 1>&2
-    fi
+	if [ -z $TEMPLATE ]; then
+		template_help 19 1>&2
+	fi
 }
 
 TEMP=$(getopt -o ":" --long "template:,help" -- "$@" )
 eval set -- "$TEMP"
 
+
 while true; do
-    case "$1" in
-        --template)
-            TEMPLATE="$2"; shift 2;;
-        --help)
-            template_help; shift;;
-        --)
-            shift; break;;
-    esac
+	case "$1" in
+		--template)
+			TEMPLATE="$2"; shift 2;;
+		--help)
+			template_help; shift;;
+		--)
+			shift; break;;
+	esac
 done
 
 check_args
 
-# Read and encode the template content
-APPS_JSON_BASE64=$(base64 -w 0 "$TEMPLATE")
+APPS_JSON=$(cat "$TEMPLATE")
+cat $TEMPLATE
 
-# Pass the Base64 encoded content to build_image.sh
-"$SCRIPT_PATH/build_image.sh" "$@" --apps-json-base64="$APPS_JSON_BASE64"
+"$SCRIPT_PATH/build_image.sh" "$@" --apps-json="$APPS_JSON"
