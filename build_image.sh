@@ -16,8 +16,8 @@ printf "    %-40s %-40s\n" '--frappe-branch=<branch>' 'default(version-14)'
 printf "    %-40s %-40s\n" '--fintech-branch=<branch>' 'branch used to substitute {fintech_branch} in --apps_json ex: [{"branch": "{fintech_branch}", "url": "https://{user}:{token}@url"}] or see transfer_company_template.json default(version-14)'
 printf "    %-40s %-40s\n" '--app-branch=<app>:<branch>' 'branch used to substitute branch for specific app (app) in --apps_json ex: [{"branch": "branch`", "url": "https://{user}:{token}@url/app.git"}] or see transfer_company_template.json default(version-14)'
 printf "    %-40s %-40s\n" '--build-commend=<commend>' 'tool used to build image default(docker)'
-printf "    %-40s %-40s\n" '--container-file=<containerfile-path>' 'Containerfile used to build image default(./frappe_docker/images/custom/Containerfile)'
-printf "    %-40s %-40s\n" '--working-dir=<path>' 'working dir for build command default (./frappe_docker)'
+printf "    %-40s %-40s\n" '--container-file=<containerfile-path>' 'Containerfile used to build image default(./FrappeContainerfile)'
+printf "    %-40s %-40s\n" '--working-dir=<path>' 'working dir for build command default (./)'
 printf "    %-40s %-40s\n" '--node-version=<version>' 'node-version used to build image (16.18.0)'
 printf "    %-40s %-40s\n" '--remove-user' 'substitute {user}:{token}@ from --apps_json ex: see transfer_company_template.json'
 printf "    %-40s %-40s\n" '--no-remove-user' 'revrese --remove-user last one will be used (default)'
@@ -41,7 +41,10 @@ function check_args() {
 }
 
 function check_json() {
+
 	if ! printf "$APPS_JSON" | jq empty ; then
+		echo "ERROR in JSON"
+		echo "$APPS_JSON"
 		build_error $BAD_JSON
 	fi
 
@@ -59,12 +62,12 @@ DUPLICATE_APPS=3
 TEMP=$(getopt -o "" --long "apps-json:,frappe-path:,frappe-branch:,token:,build-commend:,container-file:,tag:,fintech-branch:,app-branch:,working-dir:,node-version:,keygen-account:,remove-user,no-remove-user,cache,no-cache,dry-run,help" -- "$@" )
 eval set -- "$TEMP"
 
-SCRIPT_PATH="/root/test/frappe_docker/"
+SCRIPT_PATH="$(dirname "$(readlink -f "$0")")"
 FRAPPE_PATH=https://github.com/fintechsys/frappe.git
 FRAPPE_BRANCH=version-14
 FINTECH_BRANCH=version-14
 BUILD_COMMEND=docker
-CONTAINERFILE="/root/test/frappe_docker/Containerfile"
+CONTAINERFILE="$SCRIPT_PATH/FrappeContainerfile"
 WORKING_DIR="$SCRIPT_PATH/"
 REMOVE_USER=false
 APPS_BRANCHES=""
@@ -175,7 +178,7 @@ else
 
 	${BUILD_COMMEND} build ${CACHE} --build-arg=FRAPPE_PATH="${FRAPPE_PATH}" \
 			--build-arg=FRAPPE_BRANCH="${FRAPPE_BRANCH}" \
-			--build-arg=PYTHON_VERSION=3.10.5 \
+			--build-arg=PYTHON_VERSION=3.11.6 \
 			--build-arg=NODE_VERSION="${NODE_VERSION}" \
 			--build-arg=APPS_JSON_BASE64=$APPS_JSON_BASE64 \
 			--build-arg=GITHUB_AUTH_TOKEN="${TOKEN}" \
