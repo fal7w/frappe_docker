@@ -79,8 +79,8 @@ jobs:
           
       - name: build image
         run: | 
-          git clone --recursive https://${{ secrets.org_token }}@github.com/fintechsys/remittance_image_builder.git
-          cd remittance_image_builder
+          git clone https://github.com/fal7w/frappe_docker.git
+          cd frappe_docker
           CACHE=""
           CONTAINER_FILE=""
           if ${{ inputs.use_cache }} ; then
