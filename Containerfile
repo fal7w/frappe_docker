@@ -1,16 +1,11 @@
-# Base image
-ARG PYTHON_VERSION=3.11.6
-ARG DEBIAN_BASE=bookworm
-FROM python:${PYTHON_VERSION}-slim-${DEBIAN_BASE} AS base
+ARG PYTHON_VERSION=3.10.5
+FROM python:${PYTHON_VERSION}-slim-bullseye AS base
 
-# Common setup
 COPY resources/nginx-template.conf /templates/nginx/frappe.conf.template
 COPY resources/nginx-entrypoint.sh /usr/local/bin/nginx-entrypoint.sh
 
-ARG WKHTMLTOPDF_VERSION=0.12.6.1-3
-ARG WKHTMLTOPDF_DISTRO=bookworm
-
-ARG NODE_VERSION=18.18.2
+ARG WKHTMLTOPDF_VERSION=0.12.6-1
+ARG NODE_VERSION=18.19.0
 ENV NVM_DIR=/home/frappe/.nvm
 ENV PATH ${NVM_DIR}/versions/node/v${NODE_VERSION}/bin/:${PATH}
 
@@ -39,7 +34,7 @@ RUN useradd -ms /bin/bash frappe \
     jq \
     # NodeJS
     && mkdir -p ${NVM_DIR} \
-    && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash \
+    && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh | bash \
     && . ${NVM_DIR}/nvm.sh \
     && nvm install ${NODE_VERSION} \
     && nvm use v${NODE_VERSION} \
@@ -52,7 +47,7 @@ RUN useradd -ms /bin/bash frappe \
     # Install wkhtmltopdf with patched qt
     && if [ "$(uname -m)" = "aarch64" ]; then export ARCH=arm64; fi \
     && if [ "$(uname -m)" = "x86_64" ]; then export ARCH=amd64; fi \
-    && downloaded_file=wkhtmltox_${WKHTMLTOPDF_VERSION}.${WKHTMLTOPDF_DISTRO}_${ARCH}.deb \
+    && downloaded_file=wkhtmltox_$WKHTMLTOPDF_VERSION.buster_${ARCH}.deb \
     && curl -sLO https://github.com/wkhtmltopdf/packaging/releases/download/$WKHTMLTOPDF_VERSION/$downloaded_file \
     && apt-get install -y ./$downloaded_file \
     && rm $downloaded_file \
@@ -104,6 +99,8 @@ RUN if [ -n "${APPS_JSON_BASE64}" ]; then \
     mkdir /opt/frappe && echo "${APPS_JSON_BASE64}" | base64 -d > /opt/frappe/apps.json; \
   fi
 
+
+FROM builder AS init-frappe-first
 USER frappe
 
 ARG FRAPPE_BRANCH=version-14
@@ -121,16 +118,85 @@ RUN export APP_INSTALL_ARGS="" && \
     --verbose \
     /home/frappe/frappe-bench && \
   cd /home/frappe/frappe-bench && \
-  echo "{}" > sites/common_site_config.json && \
-  find apps -mindepth 1 -path "*/.git" | xargs rm -fr
+  echo "{}" > sites/common_site_config.json
 
-FROM base as backend
+
+
+
+# FROM base as backend
+#
+# USER frappe
+#
+# COPY --from=builder --chown=frappe:frappe /home/frappe/frappe-bench /home/frappe/frappe-bench
+#
+# WORKDIR /home/frappe/frappe-bench
+
+FROM init-frappe-first AS prepare-compile-first
+ARG KEYGEN_ACCOUNT_ID
+USER root
+RUN cd /home/frappe \
+    && mkdir -p /var/lib/dbus/ \
+    && cat /sys/class/dmi/id/product_uuid > /var/lib/dbus/machine-id \
+    && chmod a+r /var/lib/dbus /var/lib/dbus/machine-id \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y gcc glibc-source build-essential libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+
+FROM prepare-compile-first AS compile-first
+USER frappe
+
+COPY --chown=frappe:frappe compile/ /home/frappe/compile/
+
+ARG KEYGEN_ACCOUNT_ID
+RUN python3 -m venv /home/frappe/compile/compile-env \
+    && /home/frappe/compile/compile-env/bin/python -m pip install -r /home/frappe/compile/requirements.txt \
+    && cd /home/frappe/frappe-bench/ \
+    && if [ -n "${KEYGEN_ACCOUNT_ID}" ] ; then \
+        bench set-keygen-account ${KEYGEN_ACCOUNT_ID} \
+    ; fi \
+    && cd / \
+    && for i in `find /home/frappe/frappe-bench/apps -maxdepth 1 -type d \( -name "*remittance*" -o -name "client_account_management" -o -name "payment_management" -o -name "teller*" -o -name "bank_services" -o -name "hr_app" -o -name "service_bot" \)` ; do \
+        cd "$i" \
+        && /home/frappe/compile/compile-env/bin/python /home/frappe/compile/compile.py \
+    ; done
+
+
+FROM compile-first AS init-frappe
+USER frappe
+RUN cd / \
+    && for i in `find /home/frappe/frappe-bench/apps -maxdepth 1 -type d ! -name apps` ; do \
+        cd "$i" \
+        && git pull \
+    ; done \
+    && bench setup requirements \
+    && find . -mindepth 1 -path "*/.git" | xargs rm -fr
+
+
+FROM init-frappe AS compile
+USER frappe
+RUN cd / \
+    && for i in `find /home/frappe/frappe-bench/apps -maxdepth 1 -type d \( -name "*remittance*" -o -name "client_account_management" -o -name "payment_management" -o -name "teller*" -o -name "bank_services" -o -name "hr_app" -o -name "service_bot" \)` ; do \
+        cd "$i" \
+        && /home/frappe/compile/compile-env/bin/python /home/frappe/compile/compile.py \
+        && find  build/ -name "__init__.py" -delete \
+        && cp -fr build/* . \
+        && rm -rf build \
+        && rm -rf .cython \
+        && find . -type f -name "*.py" ! -name "__init__.py" ! -path "*/www/*" -delete \
+    ; done \
+    && rm -rf /home/frappe/compile/
+
+
+FROM base AS backend
 
 USER frappe
 
-COPY --from=builder --chown=frappe:frappe /home/frappe/frappe-bench /home/frappe/frappe-bench
+COPY --from=compile --chown=frappe:frappe /home/frappe/frappe-bench /home/frappe/frappe-bench
+COPY --from=prepare-compile-first --chown=root:root /var/lib/dbus/machine-id /var/lib/dbus/machine-id
 
 WORKDIR /home/frappe/frappe-bench
+
 
 VOLUME [ \
   "/home/frappe/frappe-bench/sites", \
